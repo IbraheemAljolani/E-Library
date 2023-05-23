@@ -1,5 +1,5 @@
 <p align="center">
-<img src="[https://www.canva.com/design/DAFjtiaudnA/6ncLhV2rPzZ5gwdrExxdmw/edit?utm_content=DAFjtiaudnA&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton]" width="90%">
+<img src="https://drive.google.com/file/d/1SQBvous6znRv-R64TD5jlkal7wcLakMI/view?usp=share_link" width="90%">
 </p>
 
 # E-Library
