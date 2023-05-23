@@ -1,6 +1,3 @@
-<p align="center">
-<img src="https://drive.google.com/file/d/1SQBvous6znRv-R64TD5jlkal7wcLakMI/view?usp=share_link">
-</p>
 
 # E-Library
 E-LibraryAPI is a RESTful API that provides access to a database called E-Library, designed to handle the storage needs of a fictional library. The database contains information about books, authors, publishers, and borrowers.
