@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://drive.google.com/file/d/1SQBvous6znRv-R64TD5jlkal7wcLakMI/view?usp=share_link" width="90%">
+<img src="https://drive.google.com/file/d/1SQBvous6znRv-R64TD5jlkal7wcLakMI/view?usp=share_link">
 </p>
 
 # E-Library
