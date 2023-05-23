@@ -171,7 +171,6 @@ namespace E_Library.Models
                 entity.Property(e => e.LoginId).HasColumnName("loginId");
 
                 entity.Property(e => e.CurrentToken)
-                    .HasMaxLength(255)
                     .IsUnicode(false)
                     .HasColumnName("currentToken");
 
@@ -188,10 +187,7 @@ namespace E_Library.Models
                     .HasColumnType("datetime")
                     .HasColumnName("lastLogout");
 
-                entity.Property(e => e.Password)
-                    .HasMaxLength(255)
-                    .IsUnicode(false)
-                    .HasColumnName("password");
+                entity.Property(e => e.PasswordHash).HasColumnName("passwordHash");
 
                 entity.HasOne(d => d.User)
                     .WithMany(p => p.Logins)

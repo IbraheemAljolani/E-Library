@@ -1,8 +1,15 @@
 ﻿using E_Library.DTOs;
 using E_Library.Models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.Win32;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace E_Library.Controllers
 {
@@ -11,9 +18,11 @@ namespace E_Library.Controllers
     public class IndexController : ControllerBase
     {
         private readonly ELibraryContext _context;
-        public IndexController(ELibraryContext context)
+        private readonly IConfiguration _configuration;
+        public IndexController(ELibraryContext context,IConfiguration configuration)
         {
-            _context = context;
+            this._context = context;
+            this._configuration = configuration;
         }
         [HttpPost]
         [Route("[action]")]
@@ -24,6 +33,7 @@ namespace E_Library.Controllers
                 var checkAccount = await _context.Logins.SingleOrDefaultAsync(x => x.Email == register.Email);
                 if (checkAccount == null)
                 {
+                    CreatePasswordHash(register.Password, out byte[] passwordHash, out byte[] passwordSalt);
                     User user = new User()
                     {
                         TypeId = 2,
@@ -39,10 +49,13 @@ namespace E_Library.Controllers
                     var checkUser = _context.Users.SingleOrDefault(x => x.Email == register.Email);
                     if (checkUser != null)
                     {
+                        string tokin = CreateToken(checkAccount);
                         Login login = new Login()
                         {
                             Email = register.Email,
-                            Password = register.Password,
+                            PasswordHash = passwordHash,
+                            PasswordSalt = passwordSalt,
+                            CurrentToken = tokin,
                             UserId = checkUser.UserId
                         };
                         await _context.AddAsync(login);
@@ -64,22 +77,31 @@ namespace E_Library.Controllers
         {
             try
             {
-                var checkAccount = await _context.Logins.SingleOrDefaultAsync(x => x.Email == login.Email && x.Password == login.Password);
-                if (checkAccount != null)
+                var checkAccount = await _context.Logins.SingleOrDefaultAsync(x => x.Email == login.Email);
+                if (checkAccount == null)
                 {
-                    checkAccount.LastLogin = DateTime.Now;
-                    _context.Update(checkAccount);
-                    await _context.SaveChangesAsync();
-                    var user = await _context.Users.SingleOrDefaultAsync(x => x.UserId == checkAccount.UserId);
-                    LoginResponseDTO loginResponse = new LoginResponseDTO()
-                    {
-                        UserId = user.UserId,
-                        Email = user.Email,
-                        TypeName = _context.Usertypes.FirstOrDefault(x => x.TypeId == user.TypeId).TypeName,
-                    };
-                    return Ok(loginResponse);
+                    return NotFound("Email does not exist");
                 }
-                return Ok("Account not found");
+
+                if(!VerifyPasswordHash(login.Password, checkAccount.PasswordHash, checkAccount.PasswordSalt))
+                {
+                    return BadRequest("Wrong Password");
+                }
+                
+                string tokin = CreateToken(checkAccount);
+                checkAccount.LastLogin = DateTime.Now;
+                checkAccount.CurrentToken = tokin;
+                _context.Update(checkAccount);
+                await _context.SaveChangesAsync();
+                var user = await _context.Users.SingleOrDefaultAsync(x => x.UserId == checkAccount.UserId);
+                LoginResponseDTO loginResponse = new LoginResponseDTO()
+                {
+                    UserId = user.UserId,
+                    Email = user.Email,
+                    TypeName = _context.Usertypes.FirstOrDefault(x => x.TypeId == user.TypeId).TypeName,
+                };
+                return Ok(loginResponse);
+
             }
             catch (Exception ex)
             {
@@ -113,19 +135,28 @@ namespace E_Library.Controllers
         {
             try
             {
-                var checkAccount = await _context.Logins.SingleOrDefaultAsync(x => x.Email == changePassword.Email && x.Password == changePassword.OldPassword);
+                var checkAccount = await _context.Logins.SingleOrDefaultAsync(x => x.Email == changePassword.Email);
+                if (!VerifyPasswordHash(changePassword.OldPassword, checkAccount.PasswordHash, checkAccount.PasswordSalt))
+                {
+                    return BadRequest("Wrong Password");
+                }
                 if (checkAccount != null)
                 {
-                    if(changePassword.NewPassword == changePassword.ConfigurePassword)
+                    
+                    if (changePassword.NewPassword == changePassword.ConfigurePassword)
                     {
-                        checkAccount.Password = changePassword.NewPassword;
+                        CreatePasswordHash(changePassword.NewPassword, out byte[] passwordHash, out byte[] passwordSalt);
+
+                        checkAccount.PasswordHash = passwordHash;
+                        checkAccount.PasswordSalt = passwordSalt;
+                        await LogoutAccount(checkAccount.LoginId);
                         _context.Update(checkAccount);
                         await _context.SaveChangesAsync();
                         return Ok("The password has been changed successfully");
                     }
                     return Ok("The new password does not match");
                 }
-                return Ok("The old password is incorrect");
+                return Ok("Account not found");
             }
             catch (Exception ex)
             {
@@ -139,11 +170,14 @@ namespace E_Library.Controllers
             try
             {
                 var checkAccount = await _context.Logins.SingleOrDefaultAsync(x => x.Email == forgotPassword.Email);
+                
                 if (checkAccount != null)
                 {
                     if (forgotPassword.NewPassword == forgotPassword.ConfigurePassword)
                     {
-                        checkAccount.Password = forgotPassword.NewPassword;
+                        CreatePasswordHash(forgotPassword.NewPassword, out byte[] passwordHash, out byte[] passwordSalt);
+                        checkAccount.PasswordHash = passwordHash;
+                        checkAccount.PasswordSalt = passwordSalt;
                         _context.Update(checkAccount);
                         await _context.SaveChangesAsync();
                         return Ok("The password has been set successfully");
@@ -156,6 +190,43 @@ namespace E_Library.Controllers
             {
                 return BadRequest(ex.Message);
             }
+        }
+        private void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
+        {
+            using (var hmac = new HMACSHA512())
+            {
+                passwordSalt = hmac.Key;
+                passwordHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
+            }
+        }
+        private bool VerifyPasswordHash(string password,  byte[] passwordHash,  byte[] passwordSalt)
+        {
+            using(var hmac = new HMACSHA512(passwordSalt))
+            {
+                var computedHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
+                return computedHash.SequenceEqual(passwordHash);
+            }
+        }
+        private string CreateToken(Login login)
+        {
+            List<Claim> claims = new List<Claim>()
+            {
+                new Claim(ClaimTypes.Email , login.Email)
+            };
+
+            var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(_configuration.GetSection("AppSetting:Token").Value));
+
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
+
+            var token = new JwtSecurityToken(
+                claims: claims,
+                expires: DateTime.Now.AddDays(1),
+                signingCredentials:creds
+                );
+
+            var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+
+            return jwt;
         }
     }
 }
