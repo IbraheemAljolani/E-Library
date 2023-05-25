@@ -43,7 +43,7 @@ namespace E_Library.Controllers
                 if (checkBookId != null)
                 {
                     var getAuther = await _context.Authors.SingleOrDefaultAsync(x => x.AuthorId == checkBookId.AuthorId);
-                    ViewBookDTO viewBook = new ViewBookDTO()
+                    ViewBookDTO viewBook = new ViewBookDTO
                     {
                         Title = checkBookId.Title,
                         AuthorName = getAuther.FirstName + " " + getAuther.LastName,

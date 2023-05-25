@@ -1,6 +1,7 @@
 ﻿using Dapper;
 using E_Library.DTOs;
 using E_Library.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -107,7 +108,7 @@ namespace E_Library.Controllers
                 var ckeckBook = await _context.Books.SingleOrDefaultAsync(x => x.Title == insertBook.Title);
                 if (ckeckBook == null)
                 {
-                    Book book = new Book()
+                    Book book = new Book
                     {
                         Title = insertBook.Title,
                         AuthorId = checkAuther.AuthorId,

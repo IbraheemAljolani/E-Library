@@ -27,7 +27,7 @@ namespace E_Library.Controllers
                     var checkUserType = _context.Usertypes.SingleOrDefault(x => x.TypeId == checkAccount.TypeId);
                     if (checkUserType != null)
                     {
-                        UserResponseDTO userResponse = new UserResponseDTO()
+                        UserResponseDTO userResponse = new UserResponseDTO
                         {
                             FirstName = checkAccount.FirstName,
                             LastName = checkAccount.LastName,
@@ -60,7 +60,7 @@ namespace E_Library.Controllers
                     var checkBook = await _context.Books.SingleOrDefaultAsync(x => x.BookId == bookId);
                     if (checkBook != null)
                     {
-                        Wishlist wishlist = new Wishlist()
+                        Wishlist wishlist = new Wishlist
                         {
                             UserId = userId,
                             BooksId = bookId,

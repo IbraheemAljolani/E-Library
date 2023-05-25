@@ -1,5 +1,6 @@
 ﻿using E_Library.DTOs;
 using E_Library.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -34,7 +35,7 @@ namespace E_Library.Controllers
                 if (checkAccount == null)
                 {
                     CreatePasswordHash(register.Password, out byte[] passwordHash, out byte[] passwordSalt);
-                    User user = new User()
+                    User user = new User
                     {
                         TypeId = 2,
                         FirstName = register.FirstName,
@@ -50,7 +51,7 @@ namespace E_Library.Controllers
                     if (checkUser != null)
                     {
                         string tokin = CreateToken(checkAccount);
-                        Login login = new Login()
+                        Login login = new Login
                         {
                             Email = register.Email,
                             PasswordHash = passwordHash,
@@ -87,6 +88,11 @@ namespace E_Library.Controllers
                 {
                     return BadRequest("Wrong Password");
                 }
+
+                if(checkAccount.LastLogout < checkAccount.LastLogin)
+                {
+                    return BadRequest("User Logged in Already");
+                }
                 
                 string tokin = CreateToken(checkAccount);
                 checkAccount.LastLogin = DateTime.Now;
@@ -94,7 +100,7 @@ namespace E_Library.Controllers
                 _context.Update(checkAccount);
                 await _context.SaveChangesAsync();
                 var user = await _context.Users.SingleOrDefaultAsync(x => x.UserId == checkAccount.UserId);
-                LoginResponseDTO loginResponse = new LoginResponseDTO()
+                LoginResponseDTO loginResponse = new LoginResponseDTO
                 {
                     UserId = user.UserId,
                     Email = user.Email,
@@ -136,7 +142,7 @@ namespace E_Library.Controllers
             try
             {
                 var checkAccount = await _context.Logins.SingleOrDefaultAsync(x => x.Email == changePassword.Email);
-                if (!VerifyPasswordHash(changePassword.OldPassword, checkAccount.PasswordHash, checkAccount.PasswordSalt))
+                if (!VerifyPasswordHash(changePassword.OldPassword, checkAccount.PasswordHash, checkAccount.PasswordSalt) && changePassword.OldPassword != changePassword.NewPassword)
                 {
                     return BadRequest("Wrong Password");
                 }
@@ -209,16 +215,22 @@ namespace E_Library.Controllers
         }
         private string CreateToken(Login login)
         {
-            List<Claim> claims = new List<Claim>()
+            var user = _context.Users.SingleOrDefault(x => x.UserId == login.UserId);
+            var userType =  _context.Usertypes.SingleOrDefault(x => x.TypeId == user.TypeId);
+            List<Claim> claims = new List<Claim>
             {
-                new Claim(ClaimTypes.Email , login.Email)
+                new Claim(ClaimTypes.Email , login.Email),
+                new Claim(ClaimTypes.Name , user.FirstName+" "+user.LastName),
+                new Claim(ClaimTypes.Role , userType.TypeName)
             };
 
-            var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(_configuration.GetSection("AppSetting:Token").Value));
+            var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(_configuration.GetSection("JWT:Key").Value));
 
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
 
             var token = new JwtSecurityToken(
+                _configuration["JWT:Issuer"],
+                _configuration["JWT:Audience"],
                 claims: claims,
                 expires: DateTime.Now.AddDays(1),
                 signingCredentials:creds
