@@ -106,7 +106,7 @@ namespace E_Library.Controllers
                     Email = user.Email,
                     TypeName = _context.Usertypes.FirstOrDefault(x => x.TypeId == user.TypeId).TypeName,
                 };
-                return Ok(loginResponse);
+                return Ok(tokin);
 
             }
             catch (Exception ex)
@@ -232,7 +232,7 @@ namespace E_Library.Controllers
                 _configuration["JWT:Issuer"],
                 _configuration["JWT:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddDays(1),
+                expires: DateTime.UtcNow.AddDays(1),
                 signingCredentials:creds
                 );
 
